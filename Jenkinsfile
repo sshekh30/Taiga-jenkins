@@ -54,7 +54,7 @@ pipeline {
     post {
         success {
             script {
-                // Get commit message FIRST, before workspace cleanup
+                // Get commit message FIRST, while git repo still exists
                 def commitMsg = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
                 echo "Commit message: ${commitMsg}"
                 
@@ -65,11 +65,11 @@ pipeline {
                 def buildUrl = "${env.BUILD_URL}"
                 def buildNumber = "${env.BUILD_NUMBER}"
                 
-                // Find all TG-X references in commit message (e.g., TG-1, TG-5)
+                // Find all TG-X references in commit message
                 def matcher = (commitMsg =~ /TG-(\d+)/)
                 def referencedTaskRefs = []
                 matcher.each { match -> 
-                    referencedTaskRefs << match[1]  // Extract just the number
+                    referencedTaskRefs << match[1]
                 }
                 
                 echo "Found Taiga task references: TG-${referencedTaskRefs.join(', TG-')}"
@@ -77,9 +77,8 @@ pipeline {
                 // Update each referenced task
                 referencedTaskRefs.each { taskRef ->
                     try {
-                        echo "Looking up Taiga task with ref #${taskRef} in project ${projectId}"
+                        echo "Looking up Taiga task with ref #${taskRef}"
                         
-                        // Query Taiga API to find the task by its ref number
                         def taskListJson = sh(
                             script: """
                                 curl -k -s -X GET \
@@ -90,27 +89,23 @@ pipeline {
                             returnStdout: true
                         ).trim()
                         
-                        // Parse JSON to get task ID
                         def idMatcher = (taskListJson =~ /"id":\s*(\d+)/)
                         if (idMatcher.find()) {
                             def taskId = idMatcher[0][1]
                             echo "Found task TG-${taskRef} with ID: ${taskId}"
                             
-                            // Get current version number
                             def versionMatcher = (taskListJson =~ /"version":\s*(\d+)/)
                             def version = versionMatcher.find() ? versionMatcher[0][1] : '1'
                             
-                            // Prepare comment
                             def comment = "Jenkins Build #${buildNumber} completed successfully!\\n" +
                                           "Build URL: ${buildUrl}\\n\\n" +
                                           "Results:\\n" +
                                           "- All 22 tests passed\\n" +
                                           "- JAR artifact created\\n" +
-                                          "- Automated via Taiga-Jenkins integration"
+                                          "- Automated Taiga-Jenkins integration"
                             
-                            echo "Updating Taiga task TG-${taskRef} (ID: ${taskId})"
+                            echo "Updating Taiga task TG-${taskRef}"
                             
-                            // Update the task with a comment
                             sh """
                                 curl -k -X PATCH \
                                   "${taigaUrl}/tasks/${taskId}" \
@@ -124,7 +119,7 @@ pipeline {
                             
                             echo "✓ Successfully updated Taiga task TG-${taskRef}"
                         } else {
-                            echo "✗ Could not find task TG-${taskRef} in project"
+                            echo "✗ Could not find task TG-${taskRef}"
                         }
                     } catch (Exception e) {
                         echo "✗ Error updating task TG-${taskRef}: ${e.message}"
@@ -136,17 +131,17 @@ pipeline {
                 }
                 
                 echo 'Build completed successfully!'
-                echo 'Taiga Task: TG-5 - COMPLETED'
                 echo 'All tests passed. Ready for deployment.'
             }
+            
+            // Clean workspace AFTER we're done with git
+            cleanWs()
         }
         failure {
             echo 'Build failed!'
-            echo 'Taiga Task: TG-5 - FAILED'
             echo 'Please check the test results and fix failing tests.'
-        }
-        always {
-            echo 'Cleaning up workspace...'
+            
+            // Clean workspace
             cleanWs()
         }
     }
