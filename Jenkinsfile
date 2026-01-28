@@ -89,13 +89,16 @@ pipeline {
                             returnStdout: true
                         ).trim()
                         
-                        def idMatcher = (taskListJson =~ /"id":\s*(\d+)/)
-                        if (idMatcher) {
-                            def taskId = idMatcher[0][1]
+                        def idMatcher = taskListJson =~ /"id":\s*(\d+)/
+                        if (idMatcher.find()) {
+                            def taskId = idMatcher.group(1)
                             echo "Found task TG-${taskRef} with ID: ${taskId}"
                             
-                            def versionMatcher = (taskListJson =~ /"version":\s*(\d+)/)
-                            def version = versionMatcher ? versionMatcher[0][1] : '1'
+                            def versionMatcher = taskListJson =~ /"version":\s*(\d+)/
+                            def version = '1'
+                            if (versionMatcher.find()) {
+                                version = versionMatcher.group(1)
+                            }
                             
                             def comment = "Jenkins Build #${buildNumber} completed successfully!\\n" +
                                           "Build URL: ${buildUrl}\\n\\n" +
