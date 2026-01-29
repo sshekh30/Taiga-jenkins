@@ -58,44 +58,112 @@ pipeline {
                 def commitMsg = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
                 echo "Commit message: ${commitMsg}"
                 
-                // Check if commit contains TG-5
-                if (commitMsg.contains('TG-5')) {
-                    echo "Found TG-5 reference in commit"
+                // Taiga API configuration
+                def taigaToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5NzI3MjkxLCJqdGkiOiJiMzE3Mzg1YjViOWU0N2RiOTY1YzBjMDA5NjhmNGE4OSIsInVzZXJfaWQiOjV9.aVwfQFUklygMOTVdN4ty-yht2cVQ8G7rnTzy2IDzVcs'
+                def taigaUrl = 'https://swent0linux.asu.edu/taiga/api/v1'
+                def projectId = 3
+                def buildUrl = "${env.BUILD_URL}"
+                def buildNumber = "${env.BUILD_NUMBER}"
+                
+                // Find all TG-X references using simple string search
+                def taskRefs = []
+                def searchText = commitMsg
+                while (searchText.contains('TG-')) {
+                    def idx = searchText.indexOf('TG-')
+                    def afterTG = searchText.substring(idx + 3)
+                    def refNum = ''
                     
-                    // Taiga API configuration
-                    def taigaToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5NzI3MjkxLCJqdGkiOiJiMzE3Mzg1YjViOWU0N2RiOTY1YzBjMDA5NjhmNGE4OSIsInVzZXJfaWQiOjV9.aVwfQFUklygMOTVdN4ty-yht2cVQ8G7rnTzy2IDzVcs'
-                    def taigaUrl = 'https://swent0linux.asu.edu/taiga/api/v1'
-                    def taskId = 110  // Hardcoded TG-5 task ID
-                    def buildUrl = "${env.BUILD_URL}"
-                    def buildNumber = "${env.BUILD_NUMBER}"
-                    
-                    try {
-                        echo "Updating Taiga task TG-5 (ID: ${taskId})"
-                        
-                        def comment = "Jenkins Build #${buildNumber} completed successfully!\\n" +
-                                      "Build URL: ${buildUrl}\\n\\n" +
-                                      "Results:\\n" +
-                                      "- All 22 tests passed\\n" +
-                                      "- JAR artifact created\\n" +
-                                      "- Fully automated Taiga-Jenkins integration!"
-                        
-                        sh """
-                            curl -k -X PATCH \
-                              "${taigaUrl}/tasks/${taskId}" \
-                              -H "Authorization: Bearer ${taigaToken}" \
-                              -H "Content-Type: application/json" \
-                              -d '{
-                                "comment": "${comment}",
-                                "version": 4
-                              }'
-                        """
-                        
-                        echo "✓ Successfully updated Taiga task TG-5!"
-                    } catch (Exception e) {
-                        echo "✗ Error: ${e.getMessage()}"
+                    // Extract digits after TG-
+                    for (int i = 0; i < afterTG.length(); i++) {
+                        def ch = afterTG.charAt(i)
+                        if (ch.isDigit()) {
+                            refNum += ch
+                        } else {
+                            break
+                        }
                     }
+                    
+                    if (refNum) {
+                        taskRefs << refNum
+                        echo "Found task reference: TG-${refNum}"
+                    }
+                    
+                    // Move past this occurrence
+                    searchText = afterTG
+                }
+                
+                // Remove duplicates
+                taskRefs = taskRefs.unique()
+                
+                if (taskRefs.isEmpty()) {
+                    echo "No Taiga task references found in commit"
                 } else {
-                    echo "No TG-5 reference found in commit"
+                    echo "Processing ${taskRefs.size()} unique task(s): TG-${taskRefs.join(', TG-')}"
+                    
+                    // Update each task
+                    taskRefs.each { refNum ->
+                        try {
+                            echo "Looking up task with ref=${refNum}"
+                            
+                            // Query Taiga API to get task by ref number
+                            def apiResponse = sh(
+                                script: """
+                                    curl -k -s -X GET \
+                                      "${taigaUrl}/tasks?project=${projectId}&ref=${refNum}" \
+                                      -H "Authorization: Bearer ${taigaToken}" \
+                                      -H "Content-Type: application/json"
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            
+                            // Parse task ID using string operations
+                            if (apiResponse.contains('"id":')) {
+                                def idIdx = apiResponse.indexOf('"id":')
+                                def afterId = apiResponse.substring(idIdx + 5).trim()
+                                def commaIdx = afterId.indexOf(',')
+                                def taskId = afterId.substring(0, commaIdx).trim()
+                                
+                                echo "Found TG-${refNum} with ID: ${taskId}"
+                                
+                                // Get version
+                                def version = '1'
+                                if (apiResponse.contains('"version":')) {
+                                    def verIdx = apiResponse.indexOf('"version":')
+                                    def afterVer = apiResponse.substring(verIdx + 10).trim()
+                                    def verComma = afterVer.indexOf(',')
+                                    version = afterVer.substring(0, verComma).trim()
+                                }
+                                
+                                // Create comment
+                                def comment = "Jenkins Build #${buildNumber} completed successfully!\\n" +
+                                              "Build URL: ${buildUrl}\\n\\n" +
+                                              "Results:\\n" +
+                                              "- All 22 tests passed\\n" +
+                                              "- JAR artifact created\\n" +
+                                              "- Fully automated Taiga-Jenkins integration!"
+                                
+                                echo "Updating TG-${refNum} (ID: ${taskId}, version: ${version})"
+                                
+                                // Update task
+                                sh """
+                                    curl -k -X PATCH \
+                                      "${taigaUrl}/tasks/${taskId}" \
+                                      -H "Authorization: Bearer ${taigaToken}" \
+                                      -H "Content-Type: application/json" \
+                                      -d '{
+                                        "comment": "${comment}",
+                                        "version": ${version}
+                                      }'
+                                """
+                                
+                                echo "✓ Successfully updated TG-${refNum}!"
+                            } else {
+                                echo "✗ Task TG-${refNum} not found in project"
+                            }
+                        } catch (Exception e) {
+                            echo "✗ Error updating TG-${refNum}: ${e.getMessage()}"
+                        }
+                    }
                 }
                 
                 echo 'Build completed successfully!'
