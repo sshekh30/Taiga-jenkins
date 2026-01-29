@@ -76,7 +76,7 @@ pipeline {
                     // Extract digits after TG-
                     for (int i = 0; i < afterTG.length(); i++) {
                         def ch = afterTG.charAt(i)
-                        if (ch.isDigit()) {
+                        if (ch >= '0' && ch <= '9') {
                             refNum += ch
                         } else {
                             break
