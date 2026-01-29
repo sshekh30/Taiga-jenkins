@@ -66,10 +66,11 @@ pipeline {
                 def buildNumber = "${env.BUILD_NUMBER}"
                 
                 // Find all TG-X references in commit message
-                def matcher = (commitMsg =~ /TG-(\d+)/)
                 def referencedTaskRefs = []
-                matcher.each { match -> 
-                    referencedTaskRefs << match[1]
+                def pattern = java.util.regex.Pattern.compile('TG-(\\d+)')
+                def matcher = pattern.matcher(commitMsg)
+                while (matcher.find()) {
+                    referencedTaskRefs << matcher.group(1)
                 }
                 
                 echo "Found Taiga task references: TG-${referencedTaskRefs.join(', TG-')}"
