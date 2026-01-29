@@ -89,15 +89,24 @@ pipeline {
                             returnStdout: true
                         ).trim()
                         
-                        def idMatcher = taskListJson =~ /"id":\s*(\d+)/
-                        if (idMatcher.find()) {
-                            def taskId = idMatcher.group(1)
+                        echo "API Response: ${taskListJson.take(200)}..."
+                        
+                        // Simple string parsing to extract task ID
+                        def idStart = taskListJson.indexOf('"id":')
+                        if (idStart > 0) {
+                            def idSubstring = taskListJson.substring(idStart + 5)
+                            def idEnd = idSubstring.indexOf(',')
+                            def taskId = idSubstring.substring(0, idEnd).trim()
+                            
                             echo "Found task TG-${taskRef} with ID: ${taskId}"
                             
-                            def versionMatcher = taskListJson =~ /"version":\s*(\d+)/
+                            // Get version number
+                            def versionStart = taskListJson.indexOf('"version":')
                             def version = '1'
-                            if (versionMatcher.find()) {
-                                version = versionMatcher.group(1)
+                            if (versionStart > 0) {
+                                def versionSubstring = taskListJson.substring(versionStart + 10)
+                                def versionEnd = versionSubstring.indexOf(',')
+                                version = versionSubstring.substring(0, versionEnd).trim()
                             }
                             
                             def comment = "Jenkins Build #${buildNumber} completed successfully!\\n" +
