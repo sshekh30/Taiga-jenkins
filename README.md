@@ -54,14 +54,3 @@ mvn test
 # Package as JAR
 mvn package
 ```
-
-## Taiga Integration
-This project includes references to Taiga issues in commit messages and code comments to demonstrate integration workflow.
-
-## Jenkins Integration
-The Jenkinsfile defines the CI/CD pipeline for automated testing and building.
-
-## Webhook Test
-Testing automatic build trigger via GitHub webhook.
-Test after disabling SSL verification
-Testing Poll SCM automation
