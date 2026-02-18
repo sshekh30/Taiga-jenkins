@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'python:3'
+            args '-u root'
+        }
+    }
 
     stages {
 
@@ -14,7 +19,8 @@ pipeline {
                 dir('Example_3') {
                     sh '''
                         pip3 install poetry
-                        poetry install
+                        poetry config virtualenvs.in-project true
+                        poetry install --no-interaction --no-ansi
                     '''
                 }
             }
