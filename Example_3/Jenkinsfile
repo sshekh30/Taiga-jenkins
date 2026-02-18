@@ -12,7 +12,10 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 dir('Example_3') {
-                    sh 'poetry install'
+                    sh '''
+                        pip3 install poetry
+                        poetry install
+                    '''
                 }
             }
         }
