@@ -1,8 +1,8 @@
 package com.example;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class GreeterTest {
 
@@ -15,7 +15,9 @@ public class GreeterTest {
 
     @Test
     void testGreet() {
-        assertEquals("Hello, Alice!", greeter.greet("Alice"));
+        String result = greeter.greet("Alice");
+        System.out.println("testGreet -> Expected: 'Hello, Alice!'  Got: '" + result + "'");
+        assertEquals("Hello, Alice!", result);
     }
 
     // -------------------------------------------------------
@@ -26,7 +28,9 @@ public class GreeterTest {
     //
     // @Test
     // void testGreetFormal() {
-    //     assertEquals("Good day, Alice.", greeter.greetFormal("Alice"));
+    //     String result = greeter.greetFormal("Alice");
+    //     System.out.println("testGreetFormal -> Expected: 'Good day, Alice.'  Got: '" + result + "'");
+    //     assertEquals("Good day, Alice.", result);
     // }
     // -------------------------------------------------------
 }
